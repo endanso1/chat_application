@@ -1,0 +1,189 @@
+body {
+  font-family: "Segoe UI", Arial, sans-serif;
+}
+
+.signup-card {
+  width: 100%;
+  max-width: 400px;
+  border-radius: 10px;
+}
+
+
+.dashboard {
+  height: calc(100vh - 56px);
+}
+
+.sidebar {
+  background: #ffffff;
+  border-right: 1px solid #dee2e6;
+}
+
+.chat-box {
+  background: #f8f9fa;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.message {
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  max-width: 75%;
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+.you {
+  background: #0d6efd;
+  color: #ffffff;
+  margin-left: auto;
+}
+
+.other {
+  background: #e9ecef;
+}
+
+.status {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.online {
+  background: green;
+}
+
+.offline {
+  background: red;
+}
+
+/* ===== LOGIN PAGE ===== */
+
+.login-page {
+  background: linear-gradient(135deg, #0d6efd, #0a58ca);
+}
+
+.login-left {
+  background: linear-gradient(180deg, rgba(13,110,253,0.95), rgba(10,88,202,0.95));
+}
+
+.login-left ul {
+  padding-left: 18px;
+}
+
+.login-left li {
+  margin-bottom: 6px;
+}
+
+.form-control {
+  border-radius: 8px;
+}
+
+.btn {
+  border-radius: 8px;
+}
+
+.card {
+  border-radius: 16px;
+}
+
+.footer {
+  position: relative;
+  bottom: 0;
+  width: 100%;
+}
+
+.footer-logo {
+  max-width: 90px;
+  height: auto;
+}
+
+.footer h6 {
+  letter-spacing: 0.5px;
+}
+
+.footer ul li {
+  margin-bottom: 4px;
+}
+
+/* ===== SUBTLE ANIMATIONS ===== */
+
+.fade-slide {
+  animation: fadeSlideIn 0.8s ease-out;
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Button hover (soft, professional) */
+.btn-primary {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.15);
+}
+
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+
+  .dashboard {
+    height: auto;
+  }
+
+  .chat-box {
+    min-height: 50vh;
+  }
+
+  .sidebar {
+    border-right: none;
+    border-bottom: 1px solid #dee2e6;
+  }
+
+  footer {
+    text-align: center;
+  }
+
+  .footer .row > div {
+    margin-bottom: 1rem;
+  }
+}
+
+@media (max-width: 768px) {
+
+  /* Reduce padding on small screens */
+  .login-page .card .p-5 {
+    padding: 2rem !important;
+  }
+
+  /* Center form content */
+  .login-page h4 {
+    text-align: center;
+  }
+
+  /* Make buttons easier to tap */
+  .login-page .btn {
+    padding: 12px;
+    font-size: 16px;
+  }
+
+  /* Reduce heading size */
+  .login-left h2 {
+    font-size: 1.5rem;
+  }
+
+  /* Improve input spacing */
+  .login-page .form-control {
+    font-size: 16px;
+  }
+}
+
