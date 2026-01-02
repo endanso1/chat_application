@@ -4,7 +4,6 @@ import {
   addDoc,
   query,
   where,
-  orderBy,
   onSnapshot,
   serverTimestamp,
   doc,
@@ -15,16 +14,18 @@ import {
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
+/* ================= DOM ================= */
 const chatBox = document.getElementById("chatBox");
 const chatTitle = document.getElementById("chatTitle");
 const userList = document.getElementById("userList");
 const messageInput = document.getElementById("messageInput");
 
+/* ================= STATE ================= */
 let currentUser = null;
-let mode = null;
+let mode = null; // "group" | "private"
 let activeGroup = null;
 let activeUser = null;
-let unsubscribe = null;
+let unsubscribeMessages = null;
 
 /* ================= AUTH ================= */
 onAuthStateChanged(auth, async (user) => {
@@ -36,13 +37,10 @@ onAuthStateChanged(auth, async (user) => {
   currentUser = user;
 
   const snap = await getDoc(doc(db, "users", user.uid));
-  if (!snap.exists()) return;
-
-  const data = snap.data();
-  document.getElementById("navUserName").textContent = data.fullName || data.email;
-
-  if (data.photoURL) {
-    document.getElementById("navProfilePic").src = data.photoURL;
+  if (snap.exists()) {
+    const data = snap.data();
+    document.getElementById("navUserName").textContent =
+      data.fullName || user.email;
   }
 
   loadUsers();
@@ -50,55 +48,72 @@ onAuthStateChanged(auth, async (user) => {
 
 /* ================= SEND MESSAGE ================= */
 window.sendMessage = async function () {
-  if (!messageInput.value || !mode) return;
+  if (!messageInput.value.trim()) return;
+  if (!mode) return;
 
-  await addDoc(collection(db, "messages"), {
+  const msg = {
     sender: currentUser.uid,
-    receiver: mode === "group" ? activeGroup : activeUser,
-    type: mode,
-    text: messageInput.value,
+    text: messageInput.value.trim(),
     timestamp: serverTimestamp()
-  });
+  };
 
+  if (mode === "group") {
+    msg.type = "group";
+    msg.receiver = activeGroup;
+  } else {
+    msg.type = "private";
+    msg.receiver = activeUser;
+    msg.participants = [currentUser.uid, activeUser];
+  }
+
+  await addDoc(collection(db, "messages"), msg);
   messageInput.value = "";
 };
 
-/* ================= GROUP ================= */
-window.selectGroup = function (id, name) {
+/* ================= GROUP CHAT ================= */
+window.selectGroup = function (groupId, groupName) {
   mode = "group";
-  activeGroup = id;
+  activeGroup = groupId;
   activeUser = null;
-  chatTitle.textContent = "Group: " + name;
-  listen();
+  chatTitle.textContent = "Group: " + groupName;
+  listenForMessages();
 };
 
-/* ================= PRIVATE ================= */
+/* ================= PRIVATE CHAT ================= */
 window.openPrivateChat = function (uid, name) {
   mode = "private";
   activeUser = uid;
   activeGroup = null;
   chatTitle.textContent = "Chat with " + name;
-  listen();
+  listenForMessages();
 };
 
 /* ================= LISTENER ================= */
-function listen() {
+function listenForMessages() {
   chatBox.innerHTML = "";
-  if (unsubscribe) unsubscribe();
+  if (unsubscribeMessages) unsubscribeMessages();
 
-  let q = query(
-    collection(db, "messages"),
-    where("type", "==", mode),
-    orderBy("timestamp")
-  );
+  let q;
 
-  unsubscribe = onSnapshot(q, (snap) => {
+  if (mode === "group") {
+    q = query(
+      collection(db, "messages"),
+      where("type", "==", "group"),
+      where("receiver", "==", activeGroup)
+    );
+  } else {
+    q = query(
+      collection(db, "messages"),
+      where("type", "==", "private"),
+      where("participants", "array-contains", currentUser.uid)
+    );
+  }
+
+  unsubscribeMessages = onSnapshot(q, (snapshot) => {
     chatBox.innerHTML = "";
 
-    snap.forEach((d) => {
-      const m = d.data();
-
-      if (mode === "group" && m.receiver !== activeGroup) return;
+    snapshot.forEach((docu) => {
+      const m = docu.data();
 
       if (
         mode === "private" &&
@@ -108,19 +123,25 @@ function listen() {
         )
       ) return;
 
-      display(m);
+      displayMessage(m);
     });
   });
 }
 
 /* ================= DISPLAY ================= */
-function display(m) {
+function displayMessage(m) {
   const div = document.createElement("div");
-  div.className = "message " + (m.sender === currentUser.uid ? "you" : "other");
+  div.className =
+    "message mb-2 p-2 rounded " +
+    (m.sender === currentUser.uid ? "bg-primary text-white text-end" : "bg-light");
 
-  const time = m.timestamp ? m.timestamp.toDate().toLocaleTimeString() : "";
+  div.innerHTML = `
+    <div>${m.text}</div>
+    <small class="opacity-75">
+      ${m.timestamp ? m.timestamp.toDate().toLocaleTimeString() : ""}
+    </small>
+  `;
 
-  div.innerHTML = `<small>${time}</small><br>${m.text}`;
   chatBox.appendChild(div);
   chatBox.scrollTop = chatBox.scrollHeight;
 }
@@ -135,14 +156,17 @@ function loadUsers() {
 
       const u = d.data();
       const li = document.createElement("li");
-      li.className = "list-group-item d-flex justify-content-between align-items-center";
+      li.className =
+        "list-group-item d-flex justify-content-between align-items-center";
 
       li.innerHTML = `
-        <span>${u.fullName || u.email}</span>
-        <span class="status ${u.online ? "online" : "offline"}"></span>
+        <span>${u.fullName || "Unnamed User"}</span>
+        <span class="badge bg-success rounded-circle">&nbsp;</span>
       `;
 
-      li.onclick = () => openPrivateChat(d.id, u.fullName || u.email);
+      li.onclick = () =>
+        openPrivateChat(d.id, u.fullName || "User");
+
       userList.appendChild(li);
     });
   });
