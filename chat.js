@@ -1,113 +1,149 @@
-import { db, auth } from "./firebase.js";
+import { auth, db } from "./firebase.js";
 import {
   collection,
   addDoc,
+  query,
+  where,
+  orderBy,
   onSnapshot,
   serverTimestamp,
-} from "firebase/firestore";
-import { onAuthStateChanged } from "firebase/auth";
-
-import {
   doc,
-  getDoc,
+  getDoc
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-
-onAuthStateChanged(auth, async (user) => {
-  if (!user) {
-    window.location = "login.html";
-    return;
-  }
-
-  const snap = await getDoc(doc(db, "users", user.uid));
-  const data = snap.data();
-
-  document.getElementById("navUserName").textContent = data.fullName;
-  document.getElementById("dashboardUserName").textContent = data.fullName;
-});
+import {
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 const chatBox = document.getElementById("chatBox");
 const chatTitle = document.getElementById("chatTitle");
 const userList = document.getElementById("userList");
 const messageInput = document.getElementById("messageInput");
 
-let mode = "group";
+let currentUser = null;
+let mode = null;
 let activeGroup = null;
 let activeUser = null;
+let unsubscribe = null;
 
-/* GROUP CHAT */
-window.selectGroup = function (id, name) {
-  mode = "group";
-  activeGroup = id;
-  chatTitle.textContent = "Group: " + name;
-};
+/* ================= AUTH ================= */
+onAuthStateChanged(auth, async (user) => {
+  if (!user) {
+    window.location.href = "login.html";
+    return;
+  }
 
-/* PRIVATE CHAT */
-window.openPrivateChat = function (uid, email) {
-  mode = "private";
-  activeUser = uid;
-  chatTitle.textContent = "Private chat with " + email;
-};
+  currentUser = user;
 
-/* SEND MESSAGE */
+  const snap = await getDoc(doc(db, "users", user.uid));
+  if (!snap.exists()) return;
+
+  const data = snap.data();
+  document.getElementById("navUserName").textContent = data.fullName || data.email;
+
+  if (data.photoURL) {
+    document.getElementById("navProfilePic").src = data.photoURL;
+  }
+
+  loadUsers();
+});
+
+/* ================= SEND MESSAGE ================= */
 window.sendMessage = async function () {
-  if (!messageInput.value) return;
+  if (!messageInput.value || !mode) return;
 
   await addDoc(collection(db, "messages"), {
-    sender: auth.currentUser.uid,
+    sender: currentUser.uid,
     receiver: mode === "group" ? activeGroup : activeUser,
     type: mode,
     text: messageInput.value,
-    timestamp: serverTimestamp(),
+    timestamp: serverTimestamp()
   });
 
   messageInput.value = "";
 };
 
-/* LISTEN FOR MESSAGES */
-onSnapshot(collection(db, "messages"), (snapshot) => {
+/* ================= GROUP ================= */
+window.selectGroup = function (id, name) {
+  mode = "group";
+  activeGroup = id;
+  activeUser = null;
+  chatTitle.textContent = "Group: " + name;
+  listen();
+};
+
+/* ================= PRIVATE ================= */
+window.openPrivateChat = function (uid, name) {
+  mode = "private";
+  activeUser = uid;
+  activeGroup = null;
+  chatTitle.textContent = "Chat with " + name;
+  listen();
+};
+
+/* ================= LISTENER ================= */
+function listen() {
   chatBox.innerHTML = "";
-  snapshot.forEach((doc) => {
-    const m = doc.data();
+  if (unsubscribe) unsubscribe();
 
-    const valid =
-      (m.type === "group" && m.receiver === activeGroup) ||
-      (m.type === "private" &&
-        ((m.sender === auth.currentUser.uid && m.receiver === activeUser) ||
-          (m.sender === activeUser && m.receiver === auth.currentUser.uid)));
+  let q = query(
+    collection(db, "messages"),
+    where("type", "==", mode),
+    orderBy("timestamp")
+  );
 
-    if (valid) {
-      const div = document.createElement("div");
-      div.className =
-        "message " + (m.sender === auth.currentUser.uid ? "you" : "other");
+  unsubscribe = onSnapshot(q, (snap) => {
+    chatBox.innerHTML = "";
 
-      const time = m.timestamp?.toDate().toLocaleTimeString();
-      div.innerHTML = `<small>${time}</small><br>${m.text}`;
-      chatBox.appendChild(div);
-      chatBox.scrollTop = chatBox.scrollHeight;
-    }
-  });
-});
+    snap.forEach((d) => {
+      const m = d.data();
 
-/* USERS LIST */
-onAuthStateChanged(auth, (user) => {
-  if (!user) return;
+      if (mode === "group" && m.receiver !== activeGroup) return;
 
-  onSnapshot(collection(db, "users"), (snapshot) => {
-    userList.innerHTML = "";
-    snapshot.forEach((doc) => {
-      if (doc.id !== user.uid) {
-        const u = doc.data();
-        const li = document.createElement("li");
-        li.className = "list-group-item d-flex justify-content-between";
-        li.innerHTML = `
-          <span>${u.email}</span>
-          <span class="status ${u.online ? "online" : "offline"}"></span>
-        `;
-        li.onclick = () => openPrivateChat(doc.id, u.email);
-        userList.appendChild(li);
-      }
+      if (
+        mode === "private" &&
+        !(
+          (m.sender === currentUser.uid && m.receiver === activeUser) ||
+          (m.sender === activeUser && m.receiver === currentUser.uid)
+        )
+      ) return;
+
+      display(m);
     });
   });
-});
+}
+
+/* ================= DISPLAY ================= */
+function display(m) {
+  const div = document.createElement("div");
+  div.className = "message " + (m.sender === currentUser.uid ? "you" : "other");
+
+  const time = m.timestamp ? m.timestamp.toDate().toLocaleTimeString() : "";
+
+  div.innerHTML = `<small>${time}</small><br>${m.text}`;
+  chatBox.appendChild(div);
+  chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+/* ================= USERS ================= */
+function loadUsers() {
+  onSnapshot(collection(db, "users"), (snap) => {
+    userList.innerHTML = "";
+
+    snap.forEach((d) => {
+      if (d.id === currentUser.uid) return;
+
+      const u = d.data();
+      const li = document.createElement("li");
+      li.className = "list-group-item d-flex justify-content-between align-items-center";
+
+      li.innerHTML = `
+        <span>${u.fullName || u.email}</span>
+        <span class="status ${u.online ? "online" : "offline"}"></span>
+      `;
+
+      li.onclick = () => openPrivateChat(d.id, u.fullName || u.email);
+      userList.appendChild(li);
+    });
+  });
+}

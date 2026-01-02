@@ -1,58 +1,82 @@
-import { auth, db } from "./firebase.js";
+import { auth, db, storage } from "./firebase.js";
 import {
   doc,
   getDoc,
-  updateDoc
+  setDoc
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
+import { onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
 import {
-  getStorage,
   ref,
   uploadBytes,
   getDownloadURL
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
-import {
-  onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+const fullNameInput = document.getElementById("fullName");
+const dobInput = document.getElementById("dob");
+const errorBox = document.getElementById("profileError");
+const previewImg = document.getElementById("profilePreview");
+const fileInput = document.getElementById("profilePicInput");
 
-const storage = getStorage();
+let currentUserId = null;
 
-onAuthStateChanged(auth, async user => {
+/* ================= AUTH CHECK ================= */
+onAuthStateChanged(auth, async (user) => {
   if (!user) {
-    window.location = "login.html";
+    window.location.href = "login.html";
     return;
   }
 
-  const snap = await getDoc(doc(db, "users", user.uid));
-  const data = snap.data();
+  currentUserId = user.uid;
 
-  document.getElementById("editFullName").value = data.fullName;
-  document.getElementById("editDOB").value = data.dob;
-  document.getElementById("profilePreview").src =
-    data.photoURL || "https://via.placeholder.com/120";
+  const snap = await getDoc(doc(db, "users", user.uid));
+  if (!snap.exists()) return;
+
+  const data = snap.data();
+  fullNameInput.value = data.fullName || "";
+  dobInput.value = data.dob || "";
+  if (data.photoURL) previewImg.src = data.photoURL;
 });
 
-window.updateProfile = async function () {
-  const user = auth.currentUser;
-  const fullName = editFullName.value;
-  const dob = editDOB.value;
-  const file = profileImage.files[0];
+/* ================= IMAGE PREVIEW ================= */
+window.previewProfilePic = function (e) {
+  const file = e.target.files[0];
+  if (file) previewImg.src = URL.createObjectURL(file);
+};
 
-  let photoURL = null;
+/* ================= SAVE PROFILE ================= */
+window.saveProfile = async function () {
+  errorBox.textContent = "";
 
-  if (file) {
-    const imgRef = ref(storage, `profiles/${user.uid}`);
-    await uploadBytes(imgRef, file);
-    photoURL = await getDownloadURL(imgRef);
+  if (!fullNameInput.value || !dobInput.value) {
+    errorBox.textContent = "Full name and date of birth are required.";
+    return;
   }
 
-  await updateDoc(doc(db, "users", user.uid), {
-    fullName,
-    dob,
-    ...(photoURL && { photoURL })
-  });
+  try {
+    const updates = {
+      fullName: fullNameInput.value,
+      dob: dobInput.value,
+      updatedAt: new Date()
+    };
 
-  alert("Profile updated successfully");
-  window.location = "index.html";
+    if (fileInput.files.length > 0) {
+      const file = fileInput.files[0];
+      const imageRef = ref(storage, `profile_pics/${currentUserId}`);
+      await uploadBytes(imageRef, file);
+      updates.photoURL = await getDownloadURL(imageRef);
+    }
+
+    await setDoc(
+      doc(db, "users", currentUserId),
+      updates,
+      { merge: true }
+    );
+
+    window.location.href = "index.html";
+  } catch (err) {
+    errorBox.textContent = err.message;
+  }
 };
