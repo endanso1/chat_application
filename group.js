@@ -10,14 +10,15 @@ import {
   getDoc
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-import {
-  onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 /* ================= DOM ================= */
 const chatBox = document.getElementById("chatBox");
 const chatTitle = document.getElementById("chatTitle");
 const userList = document.getElementById("userList");
+const groupList = document.getElementById("groupList");
+const groupNameInput = document.getElementById("groupName");
 const messageInput = document.getElementById("messageInput");
 
 /* ================= STATE ================= */
@@ -44,12 +45,48 @@ onAuthStateChanged(auth, async (user) => {
   }
 
   loadUsers();
+  loadGroups();
 });
+
+/* ================= CREATE GROUP ================= */
+window.createGroup = async function () {
+  const name = groupNameInput.value.trim();
+  if (!name) return;
+
+  try {
+    await addDoc(collection(db, "groups"), {
+      name,
+      createdAt: serverTimestamp(),
+      createdBy: currentUser.uid
+    });
+
+    groupNameInput.value = "";
+  } catch (err) {
+    console.error("Create group error:", err);
+  }
+};
+
+/* ================= LOAD GROUPS ================= */
+function loadGroups() {
+  onSnapshot(collection(db, "groups"), (snapshot) => {
+    groupList.innerHTML = "";
+
+    snapshot.forEach((docu) => {
+      const li = document.createElement("li");
+      li.className = "list-group-item list-group-item-action";
+      li.textContent = docu.data().name;
+
+      li.onclick = () =>
+        selectGroup(docu.id, docu.data().name);
+
+      groupList.appendChild(li);
+    });
+  });
+}
 
 /* ================= SEND MESSAGE ================= */
 window.sendMessage = async function () {
-  if (!messageInput.value.trim()) return;
-  if (!mode) return;
+  if (!messageInput.value.trim() || !mode) return;
 
   const msg = {
     sender: currentUser.uid,
@@ -88,7 +125,7 @@ window.openPrivateChat = function (uid, name) {
   listenForMessages();
 };
 
-/* ================= LISTENER ================= */
+/* ================= MESSAGE LISTENER ================= */
 function listenForMessages() {
   chatBox.innerHTML = "";
   if (unsubscribeMessages) unsubscribeMessages();
@@ -128,12 +165,14 @@ function listenForMessages() {
   });
 }
 
-/* ================= DISPLAY ================= */
+/* ================= DISPLAY MESSAGE ================= */
 function displayMessage(m) {
   const div = document.createElement("div");
   div.className =
     "message mb-2 p-2 rounded " +
-    (m.sender === currentUser.uid ? "bg-primary text-white text-end" : "bg-light");
+    (m.sender === currentUser.uid
+      ? "bg-primary text-white text-end"
+      : "bg-light");
 
   div.innerHTML = `
     <div>${m.text}</div>

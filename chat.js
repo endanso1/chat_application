@@ -112,19 +112,20 @@ function listenForMessages() {
   unsubscribeMessages = onSnapshot(q, (snapshot) => {
     chatBox.innerHTML = "";
 
-    snapshot.forEach((docu) => {
-      const m = docu.data();
+    // ✅ SORT LOCALLY (SAFE FOR OLD DATA)
+    const messages = snapshot.docs
+      .map(d => d.data())
+      .sort((a, b) => {
+        if (!a.timestamp || !b.timestamp) return 0;
+        return a.timestamp.seconds - b.timestamp.seconds;
+      });
 
-      if (
-        mode === "private" &&
-        !(
-          (m.sender === currentUser.uid && m.receiver === activeUser) ||
-          (m.sender === activeUser && m.receiver === currentUser.uid)
-        )
-      ) return;
+    messages.forEach(m => displayMessage(m));
 
-      displayMessage(m);
-    });
+    // ✅ SCROLL AFTER RENDER
+    setTimeout(() => {
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }, 0);
   });
 }
 
