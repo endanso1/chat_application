@@ -1,30 +1,49 @@
+/* =========================================================
+   GLOBAL STYLES
+   Applies to the entire application
+========================================================= */
+
 body {
   font-family: "Segoe UI", Arial, sans-serif;
+  margin: 0;
+  padding: 0;
 }
 
+/* Card used on signup page */
 .signup-card {
   width: 100%;
   max-width: 400px;
   border-radius: 10px;
 }
 
+/* =========================================================
+   DASHBOARD LAYOUT
+========================================================= */
 
 .dashboard {
-  height: calc(100vh - 56px);
+  height: calc(100vh - 56px); /* Full height minus navbar */
 }
 
+/* Left sidebar (Groups) */
 .sidebar {
   background: #ffffff;
   border-right: 1px solid #dee2e6;
 }
 
+/* =========================================================
+   CHAT AREA (WhatsApp Style)
+========================================================= */
+
 .chat-box {
-  background: #f8f9fa;
+  background: #efeae2;              /* WhatsApp chat background */
   height: calc(100vh - 260px);
   overflow-y: auto;
-  padding: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
 }
 
+/* Make card stretch properly */
 .card {
   display: flex;
   flex-direction: column;
@@ -35,24 +54,48 @@ body {
   overflow-y: auto;
 }
 
+/* =========================================================
+   CHAT MESSAGE BUBBLES
+========================================================= */
 
+/* Base message bubble */
 .message {
+  position: relative;
   padding: 8px 12px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
   max-width: 75%;
-  border-radius: 10px;
   font-size: 14px;
+  line-height: 1.4;
+  word-wrap: break-word;
+  border-radius: 8px;
 }
 
-.you {
-  background: #0d6efd;
-  color: #ffffff;
+/* Messages sent by logged-in user */
+.message.you {
+  background: #d9fdd3;              /* WhatsApp green */
   margin-left: auto;
+  border-top-right-radius: 0;
 }
 
-.other {
-  background: #e9ecef;
+/* Messages from other users */
+.message.other {
+  background: #ffffff;
+  margin-right: auto;
+  border-top-left-radius: 0;
 }
+
+/* Timestamp below each message */
+.message small {
+  display: block;
+  font-size: 11px;
+  color: #667781;
+  margin-top: 4px;
+  text-align: right;
+}
+
+/* =========================================================
+   USER STATUS INDICATORS
+========================================================= */
 
 .status {
   width: 10px;
@@ -68,16 +111,30 @@ body {
   background: red;
 }
 
-/* ===== LOGIN PAGE ===== */
+/* =========================================================
+   LOGIN & SIGNUP PAGES
+========================================================= */
 
+/* Page background */
 .login-page {
   background: linear-gradient(135deg, #0d6efd, #0a58ca);
 }
 
+/* Left hero section */
 .login-left {
-  background: linear-gradient(180deg, rgba(13,110,253,0.95), rgba(10,88,202,0.95));
+  background: linear-gradient(
+    180deg,
+    rgba(13, 110, 253, 0.95),
+    rgba(10, 88, 202, 0.95)
+  );
 }
 
+/* Hero text container */
+.hero-text {
+  max-width: 520px;
+}
+
+/* Feature list */
 .login-left ul {
   padding-left: 18px;
 }
@@ -86,6 +143,7 @@ body {
   margin-bottom: 6px;
 }
 
+/* Inputs & buttons */
 .form-control {
   border-radius: 8px;
 }
@@ -94,9 +152,14 @@ body {
   border-radius: 8px;
 }
 
+/* Rounded cards */
 .card {
   border-radius: 16px;
 }
+
+/* =========================================================
+   FOOTER
+========================================================= */
 
 .footer {
   position: relative;
@@ -117,7 +180,9 @@ body {
   margin-bottom: 4px;
 }
 
-/* ===== SUBTLE ANIMATIONS ===== */
+/* =========================================================
+   ANIMATIONS
+========================================================= */
 
 .fade-slide {
   animation: fadeSlideIn 0.8s ease-out;
@@ -134,7 +199,7 @@ body {
   }
 }
 
-/* Button hover (soft, professional) */
+/* Button hover effect */
 .btn-primary {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
@@ -144,23 +209,29 @@ body {
   box-shadow: 0 6px 14px rgba(0, 0, 0, 0.15);
 }
 
+/* =========================================================
+   RESPONSIVENESS – TABLETS & MOBILES
+========================================================= */
 
-/* Mobile adjustments */
 @media (max-width: 768px) {
 
+  /* Dashboard stacks vertically */
   .dashboard {
     height: auto;
   }
 
+  /* Chat box height on mobile */
   .chat-box {
-    min-height: 50vh;
+    min-height: 55vh;
   }
 
+  /* Sidebar adjustment */
   .sidebar {
     border-right: none;
     border-bottom: 1px solid #dee2e6;
   }
 
+  /* Footer alignment */
   footer {
     text-align: center;
   }
@@ -168,51 +239,13 @@ body {
   .footer .row > div {
     margin-bottom: 1rem;
   }
-}
 
-@media (max-width: 768px) {
-
-  /* Reduce padding on small screens */
+  /* Login / signup padding */
   .login-page .card .p-5 {
-    padding: 2rem !important;
+    padding: 1.8rem !important;
   }
 
-  /* Center form content */
-  .login-page h4 {
-    text-align: center;
-  }
-
-  /* Make buttons easier to tap */
-  .login-page .btn {
-    padding: 12px;
-    font-size: 16px;
-  }
-
-  /* Reduce heading size */
-  .login-left h2 {
-    font-size: 1.5rem;
-  }
-
-  /* Improve input spacing */
-  .login-page .form-control {
-    font-size: 16px;
-  }
-}
-
-/* ===== AUTH PAGES RESPONSIVENESS ===== */
-
-.hero-text {
-  max-width: 520px;
-}
-
-/* Mobile screens */
-@media (max-width: 768px) {
-
-  .hero-text {
-    text-align: center;
-    margin: auto;
-  }
-
+  /* Headings scale */
   .hero-text h1 {
     font-size: 1.8rem;
     line-height: 1.3;
@@ -223,18 +256,7 @@ body {
     margin-top: 0.5rem;
   }
 
-  /* Reduce card padding */
-  .login-page .card,
-  .signup-page .card {
-    border-radius: 14px;
-  }
-
-  .login-page .card .p-5,
-  .signup-page .card .p-5 {
-    padding: 1.8rem !important;
-  }
-
-  /* Inputs & buttons easier to tap */
+  /* Inputs easier to tap */
   .login-page input,
   .signup-page input {
     font-size: 16px;
@@ -248,7 +270,10 @@ body {
   }
 }
 
-/* Extra small phones */
+/* =========================================================
+   EXTRA SMALL PHONES
+========================================================= */
+
 @media (max-width: 480px) {
 
   .hero-text h1 {
@@ -259,4 +284,3 @@ body {
     font-size: 0.9rem;
   }
 }
-

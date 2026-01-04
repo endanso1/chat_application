@@ -132,20 +132,24 @@ function listenForMessages() {
 /* ================= DISPLAY ================= */
 function displayMessage(m) {
   const div = document.createElement("div");
+
+  // Apply WhatsApp-style classes
   div.className =
-    "message mb-2 p-2 rounded " +
-    (m.sender === currentUser.uid ? "bg-primary text-white text-end" : "bg-light");
+    "message " + (m.sender === currentUser.uid ? "you" : "other");
 
   div.innerHTML = `
     <div>${m.text}</div>
-    <small class="opacity-75">
+    <small>
       ${m.timestamp ? m.timestamp.toDate().toLocaleTimeString() : ""}
     </small>
   `;
 
   chatBox.appendChild(div);
+
+  // Always scroll to newest message
   chatBox.scrollTop = chatBox.scrollHeight;
 }
+
 
 /* ================= USERS ================= */
 function loadUsers() {

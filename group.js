@@ -1,4 +1,5 @@
 import { auth, db } from "./firebase.js";
+
 import {
   collection,
   addDoc,
@@ -7,11 +8,14 @@ import {
   onSnapshot,
   serverTimestamp,
   doc,
-  getDoc
+  getDoc,
+  updateDoc,
+  deleteDoc,
+  arrayUnion,
+  arrayRemove,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-import { onAuthStateChanged }
-  from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 /* ================= DOM ================= */
 const chatBox = document.getElementById("chatBox");
@@ -39,9 +43,8 @@ onAuthStateChanged(auth, async (user) => {
 
   const snap = await getDoc(doc(db, "users", user.uid));
   if (snap.exists()) {
-    const data = snap.data();
     document.getElementById("navUserName").textContent =
-      data.fullName || user.email;
+      snap.data().fullName || user.email;
   }
 
   loadUsers();
@@ -53,17 +56,14 @@ window.createGroup = async function () {
   const name = groupNameInput.value.trim();
   if (!name) return;
 
-  try {
-    await addDoc(collection(db, "groups"), {
-      name,
-      createdAt: serverTimestamp(),
-      createdBy: currentUser.uid
-    });
+  await addDoc(collection(db, "groups"), {
+    name,
+    admin: currentUser.uid, // 👈 REQUIRED
+    members: [currentUser.uid], // 👈 REQUIRED
+    createdAt: serverTimestamp(),
+  });
 
-    groupNameInput.value = "";
-  } catch (err) {
-    console.error("Create group error:", err);
-  }
+  groupNameInput.value = "";
 };
 
 /* ================= LOAD GROUPS ================= */
@@ -72,16 +72,104 @@ function loadGroups() {
     groupList.innerHTML = "";
 
     snapshot.forEach((docu) => {
-      const li = document.createElement("li");
-      li.className = "list-group-item list-group-item-action";
-      li.textContent = docu.data().name;
+      const g = docu.data();
+      const groupId = docu.id;
 
-      li.onclick = () =>
-        selectGroup(docu.id, docu.data().name);
+      const isMember = g.members?.includes(currentUser.uid);
+      const isAdmin = g.admin === currentUser.uid;
+
+      const li = document.createElement("li");
+      li.className =
+        "list-group-item d-flex justify-content-between align-items-center";
+
+      li.innerHTML = `
+        <span class="fw-semibold">${g.name}</span>
+
+        <div class="btn-group btn-group-sm">
+          ${
+            isMember
+              ? `<button class="btn btn-outline-danger">Leave</button>`
+              : `<button class="btn btn-outline-success">Join</button>`
+          }
+          ${
+            isAdmin
+              ? `<button class="btn btn-outline-secondary">Edit</button>
+                 <button class="btn btn-outline-dark">Delete</button>`
+              : ``
+          }
+        </div>
+      `;
+
+      const buttons = li.querySelectorAll("button");
+
+      // Join / Leave
+      buttons[0].onclick = () =>
+        isMember ? leaveGroup(groupId) : joinGroup(groupId);
+
+      // Edit / Delete (Admin only)
+      if (isAdmin) {
+        buttons[1].onclick = () => editGroup(groupId, g.name);
+        buttons[2].onclick = () => deleteGroup(groupId);
+      }
+
+      // Open chat only if member
+      li.querySelector("span").onclick = () => {
+        if (!isMember) {
+          alert("Join the group to access messages");
+          return;
+        }
+        selectGroup(groupId, g.name);
+      };
 
       groupList.appendChild(li);
     });
   });
+}
+
+/* ================= JOIN / LEAVE / EDIT / DELETE ================= */
+// async function joinGroup(groupId) {
+//   await updateDoc(doc(db, "groups", groupId), {
+//     members: arrayUnion(currentUser.uid)
+//   });
+// }
+async function joinGroup(groupId) {
+  const ref = doc(db, "groups", groupId);
+  await updateDoc(ref, {
+    members: arrayUnion(currentUser.uid),
+  });
+}
+
+async function leaveGroup(groupId) {
+  await updateDoc(doc(db, "groups", groupId), {
+    members: arrayRemove(currentUser.uid),
+  });
+
+  if (activeGroup === groupId) {
+    chatBox.innerHTML = "";
+    chatTitle.textContent = "Select a chat";
+    mode = null;
+  }
+}
+
+async function editGroup(groupId, oldName) {
+  const newName = prompt("Edit group name:", oldName);
+  if (!newName) return;
+
+  await updateDoc(doc(db, "groups", groupId), {
+    name: newName.trim(),
+  });
+}
+
+async function deleteGroup(groupId) {
+  if (!confirm("Delete this group permanently?")) return;
+
+  await deleteDoc(doc(db, "groups", groupId));
+
+  if (activeGroup === groupId) {
+    chatBox.innerHTML = "";
+    chatTitle.textContent = "Select a chat";
+    mode = null;
+  }
 }
 
 /* ================= SEND MESSAGE ================= */
@@ -91,7 +179,7 @@ window.sendMessage = async function () {
   const msg = {
     sender: currentUser.uid,
     text: messageInput.value.trim(),
-    timestamp: serverTimestamp()
+    timestamp: serverTimestamp(),
   };
 
   if (mode === "group") {
@@ -107,7 +195,7 @@ window.sendMessage = async function () {
   messageInput.value = "";
 };
 
-/* ================= GROUP CHAT ================= */
+/* ================= SELECT GROUP ================= */
 window.selectGroup = function (groupId, groupName) {
   mode = "group";
   activeGroup = groupId;
@@ -149,40 +237,43 @@ function listenForMessages() {
   unsubscribeMessages = onSnapshot(q, (snapshot) => {
     chatBox.innerHTML = "";
 
-    snapshot.forEach((docu) => {
-      const m = docu.data();
+    const messages = snapshot.docs
+      .map((d) => d.data())
+      .sort((a, b) => {
+        if (!a.timestamp || !b.timestamp) return 0;
+        return a.timestamp.seconds - b.timestamp.seconds;
+      });
 
+    messages.forEach((m) => {
       if (
         mode === "private" &&
         !(
           (m.sender === currentUser.uid && m.receiver === activeUser) ||
           (m.sender === activeUser && m.receiver === currentUser.uid)
         )
-      ) return;
+      )
+        return;
 
       displayMessage(m);
     });
+
+    chatBox.scrollTop = chatBox.scrollHeight;
   });
 }
 
 /* ================= DISPLAY MESSAGE ================= */
 function displayMessage(m) {
   const div = document.createElement("div");
-  div.className =
-    "message mb-2 p-2 rounded " +
-    (m.sender === currentUser.uid
-      ? "bg-primary text-white text-end"
-      : "bg-light");
+  div.className = "message " + (m.sender === currentUser.uid ? "you" : "other");
 
   div.innerHTML = `
     <div>${m.text}</div>
-    <small class="opacity-75">
+    <small class="opacity-75 d-block text-end">
       ${m.timestamp ? m.timestamp.toDate().toLocaleTimeString() : ""}
     </small>
   `;
 
   chatBox.appendChild(div);
-  chatBox.scrollTop = chatBox.scrollHeight;
 }
 
 /* ================= USERS ================= */
@@ -199,12 +290,11 @@ function loadUsers() {
         "list-group-item d-flex justify-content-between align-items-center";
 
       li.innerHTML = `
-        <span>${u.fullName || "Unnamed User"}</span>
+        <span>${u.fullName || "User"}</span>
         <span class="badge bg-success rounded-circle">&nbsp;</span>
       `;
 
-      li.onclick = () =>
-        openPrivateChat(d.id, u.fullName || "User");
+      li.onclick = () => openPrivateChat(d.id, u.fullName || "User");
 
       userList.appendChild(li);
     });
