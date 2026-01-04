@@ -24,13 +24,16 @@ const userList = document.getElementById("userList");
 const groupList = document.getElementById("groupList");
 const groupNameInput = document.getElementById("groupName");
 const messageInput = document.getElementById("messageInput");
+const groupMembersList = document.getElementById("groupMembers");
 
 /* ================= STATE ================= */
 let currentUser = null;
 let mode = null; // "group" | "private"
 let activeGroup = null;
 let activeUser = null;
+
 let unsubscribeMessages = null;
+let unsubscribeGroupMembers = null;
 
 /* ================= AUTH ================= */
 onAuthStateChanged(auth, async (user) => {
@@ -52,14 +55,14 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 /* ================= CREATE GROUP ================= */
-window.createGroup = async function () {
+window.createGroup = async () => {
   const name = groupNameInput.value.trim();
   if (!name) return;
 
   await addDoc(collection(db, "groups"), {
     name,
-    admin: currentUser.uid, // 👈 REQUIRED
-    members: [currentUser.uid], // 👈 REQUIRED
+    admin: currentUser.uid,
+    members: [currentUser.uid],
     createdAt: serverTimestamp(),
   });
 
@@ -84,7 +87,6 @@ function loadGroups() {
 
       li.innerHTML = `
         <span class="fw-semibold">${g.name}</span>
-
         <div class="btn-group btn-group-sm">
           ${
             isMember
@@ -102,17 +104,14 @@ function loadGroups() {
 
       const buttons = li.querySelectorAll("button");
 
-      // Join / Leave
       buttons[0].onclick = () =>
         isMember ? leaveGroup(groupId) : joinGroup(groupId);
 
-      // Edit / Delete (Admin only)
       if (isAdmin) {
         buttons[1].onclick = () => editGroup(groupId, g.name);
         buttons[2].onclick = () => deleteGroup(groupId);
       }
 
-      // Open chat only if member
       li.querySelector("span").onclick = () => {
         if (!isMember) {
           alert("Join the group to access messages");
@@ -126,15 +125,9 @@ function loadGroups() {
   });
 }
 
-/* ================= JOIN / LEAVE / EDIT / DELETE ================= */
-// async function joinGroup(groupId) {
-//   await updateDoc(doc(db, "groups", groupId), {
-//     members: arrayUnion(currentUser.uid)
-//   });
-// }
+/* ================= JOIN / LEAVE ================= */
 async function joinGroup(groupId) {
-  const ref = doc(db, "groups", groupId);
-  await updateDoc(ref, {
+  await updateDoc(doc(db, "groups", groupId), {
     members: arrayUnion(currentUser.uid),
   });
 }
@@ -144,13 +137,10 @@ async function leaveGroup(groupId) {
     members: arrayRemove(currentUser.uid),
   });
 
-  if (activeGroup === groupId) {
-    chatBox.innerHTML = "";
-    chatTitle.textContent = "Select a chat";
-    mode = null;
-  }
+  if (activeGroup === groupId) resetChatUI();
 }
 
+/* ================= EDIT / DELETE ================= */
 async function editGroup(groupId, oldName) {
   const newName = prompt("Edit group name:", oldName);
   if (!newName) return;
@@ -164,16 +154,63 @@ async function deleteGroup(groupId) {
   if (!confirm("Delete this group permanently?")) return;
 
   await deleteDoc(doc(db, "groups", groupId));
+  if (activeGroup === groupId) resetChatUI();
+}
 
-  if (activeGroup === groupId) {
-    chatBox.innerHTML = "";
-    chatTitle.textContent = "Select a chat";
-    mode = null;
-  }
+/* ================= SELECT GROUP ================= */
+window.selectGroup = (groupId, groupName) => {
+  mode = "group";
+  activeGroup = groupId;
+  activeUser = null;
+
+  chatTitle.textContent = "Group: " + groupName;
+
+  listenForMessages();
+  listenForGroupMembers(groupId);
+};
+
+/* ================= GROUP MEMBERS ================= */
+function listenForGroupMembers(groupId) {
+  if (unsubscribeGroupMembers) unsubscribeGroupMembers();
+
+  const groupRef = doc(db, "groups", groupId);
+
+  unsubscribeGroupMembers = onSnapshot(groupRef, async (snap) => {
+    if (!snap.exists()) return;
+
+    const g = snap.data();
+    groupMembersList.innerHTML = "";
+
+    for (const uid of g.members) {
+      const userSnap = await getDoc(doc(db, "users", uid));
+      if (!userSnap.exists()) continue;
+
+      const u = userSnap.data();
+
+      const li = document.createElement("li");
+      li.className =
+        "list-group-item d-flex justify-content-between align-items-center";
+
+      li.innerHTML = `
+        <span>${u.fullName || "User"}</span>
+        ${
+          uid === g.admin
+            ? `<span class="badge rounded-pill bg-warning text-dark px-2">
+       Admin
+     </span>`
+            : `<span class="badge rounded-pill bg-secondary px-2">
+       Member
+     </span>`
+        }
+      `;
+
+      groupMembersList.appendChild(li);
+    }
+  });
 }
 
 /* ================= SEND MESSAGE ================= */
-window.sendMessage = async function () {
+window.sendMessage = async () => {
   if (!messageInput.value.trim() || !mode) return;
 
   const msg = {
@@ -195,67 +232,31 @@ window.sendMessage = async function () {
   messageInput.value = "";
 };
 
-/* ================= SELECT GROUP ================= */
-window.selectGroup = function (groupId, groupName) {
-  mode = "group";
-  activeGroup = groupId;
-  activeUser = null;
-  chatTitle.textContent = "Group: " + groupName;
-  listenForMessages();
-};
-
-/* ================= PRIVATE CHAT ================= */
-window.openPrivateChat = function (uid, name) {
-  mode = "private";
-  activeUser = uid;
-  activeGroup = null;
-  chatTitle.textContent = "Chat with " + name;
-  listenForMessages();
-};
-
 /* ================= MESSAGE LISTENER ================= */
 function listenForMessages() {
   chatBox.innerHTML = "";
   if (unsubscribeMessages) unsubscribeMessages();
 
-  let q;
-
-  if (mode === "group") {
-    q = query(
-      collection(db, "messages"),
-      where("type", "==", "group"),
-      where("receiver", "==", activeGroup)
-    );
-  } else {
-    q = query(
-      collection(db, "messages"),
-      where("type", "==", "private"),
-      where("participants", "array-contains", currentUser.uid)
-    );
-  }
+  const q =
+    mode === "group"
+      ? query(
+          collection(db, "messages"),
+          where("type", "==", "group"),
+          where("receiver", "==", activeGroup)
+        )
+      : query(
+          collection(db, "messages"),
+          where("type", "==", "private"),
+          where("participants", "array-contains", currentUser.uid)
+        );
 
   unsubscribeMessages = onSnapshot(q, (snapshot) => {
     chatBox.innerHTML = "";
 
-    const messages = snapshot.docs
+    snapshot.docs
       .map((d) => d.data())
-      .sort((a, b) => {
-        if (!a.timestamp || !b.timestamp) return 0;
-        return a.timestamp.seconds - b.timestamp.seconds;
-      });
-
-    messages.forEach((m) => {
-      if (
-        mode === "private" &&
-        !(
-          (m.sender === currentUser.uid && m.receiver === activeUser) ||
-          (m.sender === activeUser && m.receiver === currentUser.uid)
-        )
-      )
-        return;
-
-      displayMessage(m);
-    });
+      .sort((a, b) => (a.timestamp?.seconds || 0) - (b.timestamp?.seconds || 0))
+      .forEach(displayMessage);
 
     chatBox.scrollTop = chatBox.scrollHeight;
   });
@@ -295,8 +296,32 @@ function loadUsers() {
       `;
 
       li.onclick = () => openPrivateChat(d.id, u.fullName || "User");
-
       userList.appendChild(li);
     });
   });
+}
+
+/* ================= PRIVATE CHAT ================= */
+window.openPrivateChat = (uid, name) => {
+  mode = "private";
+  activeUser = uid;
+  activeGroup = null;
+
+  chatTitle.textContent = "Chat with " + name;
+
+  if (unsubscribeGroupMembers) unsubscribeGroupMembers();
+  groupMembersList.innerHTML = `<li class="list-group-item text-center text-muted">Private chat</li>`;
+
+  listenForMessages();
+};
+
+/* ================= RESET ================= */
+function resetChatUI() {
+  chatBox.innerHTML = "";
+  chatTitle.textContent = "Select a Group or User";
+  groupMembersList.innerHTML = `<li class="list-group-item text-center text-muted">Select a group</li>`;
+
+  mode = null;
+  activeGroup = null;
+  activeUser = null;
 }

@@ -40,56 +40,66 @@
   <div class="row dashboard">
 
     <!-- GROUPS -->
-    <div class="col-md-3 sidebar p-3">
-      <button class="btn btn-outline-primary w-100 d-md-none mb-2"
-        data-bs-toggle="collapse"
-        data-bs-target="#groupSection">
-        Groups
-      </button>
+<div class="col-md-3 sidebar p-3">
+  <button class="btn btn-outline-primary w-100 d-md-none mb-2"
+    data-bs-toggle="collapse"
+    data-bs-target="#groupSection">
+    Groups
+  </button>
 
-      <div id="groupSection" class="collapse d-md-block">
-        <h6 class="d-none d-md-block">Groups</h6>
-        <ul id="groupList" class="list-group mb-3"></ul>
+  <div id="groupSection" class="collapse d-md-block">
+    <h6 class="d-none d-md-block">Groups</h6>
+    <ul id="groupList" class="list-group mb-3"></ul>
 
-        <input id="groupName" class="form-control mb-2" placeholder="New group name">
-        <button class="btn btn-success w-100" onclick="createGroup()">
-          Create Group
-        </button>
-      </div>
+    <input id="groupName" class="form-control mb-2" placeholder="New group name">
+    <button class="btn btn-success w-100" onclick="createGroup()">
+      Create Group
+    </button>
+  </div>
+</div>
+
+<!-- MEMBERS + USERS -->
+<div class="col-md-3 p-3">
+
+  <!-- GROUP MEMBERS -->
+  <div class="card mb-3">
+    <div class="card-header fw-bold text-center">
+      Group Members
     </div>
 
-     <!-- USERS -->
-    <div class="col-md-3 p-3">
-      <button class="btn btn-outline-primary w-100 d-md-none mb-2"
-        data-bs-toggle="collapse"
-        data-bs-target="#userSection">
-        Users
-      </button>
+    <ul id="groupMembers" class="list-group list-group-flush small">
+      <li class="list-group-item text-muted text-center">
+        Select a group
+      </li>
+    </ul>
+  </div>
 
-      <div id="userSection" class="collapse d-md-block">
-        <div class="card h-100">
-          <div class="card-header fw-bold d-none d-md-block">Users</div>
-          <ul id="userList" class="list-group list-group-flush"></ul>
-        </div>
+  <!-- USERS -->
+  <div class="card h-100">
+    <div class="card-header fw-bold">Users</div>
+    <ul id="userList" class="list-group list-group-flush"></ul>
+  </div>
+
+</div>
+
+<!-- CHAT -->
+<div class="col-md-6 p-3">
+  <div class="card h-100">
+    <div class="card-header fw-bold" id="chatTitle">
+      Select a Group or User
+    </div>
+
+    <div class="card-body chat-box" id="chatBox"></div>
+
+    <div class="card-footer">
+      <div class="input-group">
+        <input id="messageInput" class="form-control" placeholder="Type message">
+        <button class="btn btn-primary" onclick="sendMessage()">Send</button>
       </div>
     </div>
-    <!-- CHAT -->
-    <div class="col-md-6 p-3">
-      <div class="card h-100">
-        <div class="card-header fw-bold" id="chatTitle">
-          Select a Group or User
-        </div>
+  </div>
+</div>
 
-        <div class="card-body chat-box" id="chatBox"></div>
-
-        <div class="card-footer">
-          <div class="input-group">
-            <input id="messageInput" class="form-control" placeholder="Type message">
-            <button class="btn btn-primary" onclick="sendMessage()">Send</button>
-          </div>
-        </div>
-      </div>
-    </div>
 
 
   </div>
