@@ -15,7 +15,9 @@ import {
   arrayRemove,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import {
+  onAuthStateChanged,
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 /* ================= DOM ================= */
 const chatBox = document.getElementById("chatBox");
@@ -31,9 +33,28 @@ let currentUser = null;
 let mode = null; // "group" | "private"
 let activeGroup = null;
 let activeUser = null;
+let activeChatId = null;
 
 let unsubscribeMessages = null;
 let unsubscribeGroupMembers = null;
+
+const userCache = {}; // uid → fullName
+
+/* ================= HELPERS ================= */
+function getPrivateChatId(uid1, uid2) {
+  return [uid1, uid2].sort().join("_");
+}
+
+async function getSenderName(uid) {
+  if (userCache[uid]) return userCache[uid];
+
+  const snap = await getDoc(doc(db, "users", uid));
+  if (!snap.exists()) return "Unknown";
+
+  const name = snap.data().fullName || "User";
+  userCache[uid] = name;
+  return name;
+}
 
 /* ================= AUTH ================= */
 onAuthStateChanged(auth, async (user) => {
@@ -59,7 +80,7 @@ window.createGroup = async () => {
   const name = groupNameInput.value.trim();
   if (!name) return;
 
-  await addDoc(collection(db, "groups"), {
+  const ref = await addDoc(collection(db, "groups"), {
     name,
     admin: currentUser.uid,
     members: [currentUser.uid],
@@ -67,6 +88,7 @@ window.createGroup = async () => {
   });
 
   groupNameInput.value = "";
+  selectGroup(ref.id, name);
 };
 
 /* ================= LOAD GROUPS ================= */
@@ -162,6 +184,7 @@ window.selectGroup = (groupId, groupName) => {
   mode = "group";
   activeGroup = groupId;
   activeUser = null;
+  activeChatId = null;
 
   chatTitle.textContent = "Group: " + groupName;
 
@@ -173,9 +196,7 @@ window.selectGroup = (groupId, groupName) => {
 function listenForGroupMembers(groupId) {
   if (unsubscribeGroupMembers) unsubscribeGroupMembers();
 
-  const groupRef = doc(db, "groups", groupId);
-
-  unsubscribeGroupMembers = onSnapshot(groupRef, async (snap) => {
+  unsubscribeGroupMembers = onSnapshot(doc(db, "groups", groupId), async (snap) => {
     if (!snap.exists()) return;
 
     const g = snap.data();
@@ -186,8 +207,8 @@ function listenForGroupMembers(groupId) {
       if (!userSnap.exists()) continue;
 
       const u = userSnap.data();
-
       const li = document.createElement("li");
+
       li.className =
         "list-group-item d-flex justify-content-between align-items-center";
 
@@ -195,12 +216,8 @@ function listenForGroupMembers(groupId) {
         <span>${u.fullName || "User"}</span>
         ${
           uid === g.admin
-            ? `<span class="badge rounded-pill bg-warning text-dark px-2">
-       Admin
-     </span>`
-            : `<span class="badge rounded-pill bg-secondary px-2">
-       Member
-     </span>`
+            ? `<span class="badge rounded-pill bg-warning text-dark px-2">Admin</span>`
+            : `<span class="badge rounded-pill bg-secondary px-2">Member</span>`
         }
       `;
 
@@ -224,7 +241,7 @@ window.sendMessage = async () => {
     msg.receiver = activeGroup;
   } else {
     msg.type = "private";
-    msg.receiver = activeUser;
+    msg.chatId = activeChatId;
     msg.participants = [currentUser.uid, activeUser];
   }
 
@@ -237,37 +254,62 @@ function listenForMessages() {
   chatBox.innerHTML = "";
   if (unsubscribeMessages) unsubscribeMessages();
 
-  const q =
-    mode === "group"
-      ? query(
-          collection(db, "messages"),
-          where("type", "==", "group"),
-          where("receiver", "==", activeGroup)
-        )
-      : query(
-          collection(db, "messages"),
-          where("type", "==", "private"),
-          where("participants", "array-contains", currentUser.uid)
-        );
+  let q;
 
-  unsubscribeMessages = onSnapshot(q, (snapshot) => {
+  if (mode === "group") {
+    q = query(
+      collection(db, "messages"),
+      where("type", "==", "group"),
+      where("receiver", "==", activeGroup)
+    );
+  } else {
+    // ✅ PRIVATE CHAT (SAFE & CORRECT)
+    q = query(
+      collection(db, "messages"),
+      where("type", "==", "private"),
+      where("participants", "array-contains", currentUser.uid),
+      where("chatId", "==", activeChatId)
+    );
+  }
+
+  unsubscribeMessages = onSnapshot(q, async (snapshot) => {
     chatBox.innerHTML = "";
 
-    snapshot.docs
-      .map((d) => d.data())
-      .sort((a, b) => (a.timestamp?.seconds || 0) - (b.timestamp?.seconds || 0))
-      .forEach(displayMessage);
+    const messages = snapshot.docs
+      .map(d => d.data())
+      .sort(
+        (a, b) =>
+          (a.timestamp?.seconds || 0) -
+          (b.timestamp?.seconds || 0)
+      );
+
+    for (const m of messages) {
+      await displayMessage(m);
+    }
 
     chatBox.scrollTop = chatBox.scrollHeight;
   });
 }
 
+
 /* ================= DISPLAY MESSAGE ================= */
-function displayMessage(m) {
+async function displayMessage(m) {
+  const isMe = m.sender === currentUser.uid;
   const div = document.createElement("div");
-  div.className = "message " + (m.sender === currentUser.uid ? "you" : "other");
+
+  div.className = "message " + (isMe ? "you" : "other");
+
+  let senderLine = "";
+  if (mode === "group" && !isMe) {
+    senderLine = `
+      <div class="small fw-semibold mb-1">
+        ${await getSenderName(m.sender)}
+      </div>
+    `;
+  }
 
   div.innerHTML = `
+    ${senderLine}
     <div>${m.text}</div>
     <small class="opacity-75 d-block text-end">
       ${m.timestamp ? m.timestamp.toDate().toLocaleTimeString() : ""}
@@ -287,6 +329,7 @@ function loadUsers() {
 
       const u = d.data();
       const li = document.createElement("li");
+
       li.className =
         "list-group-item d-flex justify-content-between align-items-center";
 
@@ -302,26 +345,46 @@ function loadUsers() {
 }
 
 /* ================= PRIVATE CHAT ================= */
+// window.openPrivateChat = (uid, name) => {
+//   mode = "private";
+//   activeUser = uid;
+//   activeGroup = null;
+//   activeChatId = getPrivateChatId(currentUser.uid, uid);
+
+//   chatTitle.textContent = "Chat with " + name;
+
+//   if (unsubscribeGroupMembers) unsubscribeGroupMembers();
+//   groupMembersList.innerHTML =
+//     `<li class="list-group-item text-center text-muted">Private chat</li>`;
+
+//   listenForMessages();
+// };
 window.openPrivateChat = (uid, name) => {
-  mode = "private";
+  // ✅ SET STATE FIRST
+  activeChatId = getPrivateChatId(currentUser.uid, uid);
   activeUser = uid;
   activeGroup = null;
+  mode = "private";
 
   chatTitle.textContent = "Chat with " + name;
 
   if (unsubscribeGroupMembers) unsubscribeGroupMembers();
-  groupMembersList.innerHTML = `<li class="list-group-item text-center text-muted">Private chat</li>`;
+  groupMembersList.innerHTML =
+    `<li class="list-group-item text-center text-muted">Private chat</li>`;
 
   listenForMessages();
 };
+
 
 /* ================= RESET ================= */
 function resetChatUI() {
   chatBox.innerHTML = "";
   chatTitle.textContent = "Select a Group or User";
-  groupMembersList.innerHTML = `<li class="list-group-item text-center text-muted">Select a group</li>`;
+  groupMembersList.innerHTML =
+    `<li class="list-group-item text-center text-muted">Select a group</li>`;
 
   mode = null;
   activeGroup = null;
   activeUser = null;
+  activeChatId = null;
 }
