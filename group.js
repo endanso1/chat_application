@@ -15,9 +15,7 @@ import {
   arrayRemove,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-import {
-  onAuthStateChanged,
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 /* ================= DOM ================= */
 const chatBox = document.getElementById("chatBox");
@@ -196,23 +194,25 @@ window.selectGroup = (groupId, groupName) => {
 function listenForGroupMembers(groupId) {
   if (unsubscribeGroupMembers) unsubscribeGroupMembers();
 
-  unsubscribeGroupMembers = onSnapshot(doc(db, "groups", groupId), async (snap) => {
-    if (!snap.exists()) return;
+  unsubscribeGroupMembers = onSnapshot(
+    doc(db, "groups", groupId),
+    async (snap) => {
+      if (!snap.exists()) return;
 
-    const g = snap.data();
-    groupMembersList.innerHTML = "";
+      const g = snap.data();
+      groupMembersList.innerHTML = "";
 
-    for (const uid of g.members) {
-      const userSnap = await getDoc(doc(db, "users", uid));
-      if (!userSnap.exists()) continue;
+      for (const uid of g.members) {
+        const userSnap = await getDoc(doc(db, "users", uid));
+        if (!userSnap.exists()) continue;
 
-      const u = userSnap.data();
-      const li = document.createElement("li");
+        const u = userSnap.data();
+        const li = document.createElement("li");
 
-      li.className =
-        "list-group-item d-flex justify-content-between align-items-center";
+        li.className =
+          "list-group-item d-flex justify-content-between align-items-center";
 
-      li.innerHTML = `
+        li.innerHTML = `
         <span>${u.fullName || "User"}</span>
         ${
           uid === g.admin
@@ -221,9 +221,10 @@ function listenForGroupMembers(groupId) {
         }
       `;
 
-      groupMembersList.appendChild(li);
+        groupMembersList.appendChild(li);
+      }
     }
-  });
+  );
 }
 
 /* ================= SEND MESSAGE ================= */
@@ -276,11 +277,9 @@ function listenForMessages() {
     chatBox.innerHTML = "";
 
     const messages = snapshot.docs
-      .map(d => d.data())
+      .map((d) => d.data())
       .sort(
-        (a, b) =>
-          (a.timestamp?.seconds || 0) -
-          (b.timestamp?.seconds || 0)
+        (a, b) => (a.timestamp?.seconds || 0) - (b.timestamp?.seconds || 0)
       );
 
     for (const m of messages) {
@@ -290,7 +289,6 @@ function listenForMessages() {
     chatBox.scrollTop = chatBox.scrollHeight;
   });
 }
-
 
 /* ================= DISPLAY MESSAGE ================= */
 async function displayMessage(m) {
@@ -312,8 +310,9 @@ async function displayMessage(m) {
     ${senderLine}
     <div>${m.text}</div>
     <small class="opacity-75 d-block text-end">
-      ${m.timestamp ? m.timestamp.toDate().toLocaleTimeString() : ""}
-    </small>
+  ${m.timestamp ? m.timestamp.toDate().toLocaleString() : ""}
+</small>
+
   `;
 
   chatBox.appendChild(div);
@@ -335,7 +334,7 @@ function loadUsers() {
 
       li.innerHTML = `
         <span>${u.fullName || "User"}</span>
-        <span class="badge bg-success rounded-circle">&nbsp;</span>
+        <span class="badge">&nbsp;</span>
       `;
 
       li.onclick = () => openPrivateChat(d.id, u.fullName || "User");
@@ -369,19 +368,16 @@ window.openPrivateChat = (uid, name) => {
   chatTitle.textContent = "Chat with " + name;
 
   if (unsubscribeGroupMembers) unsubscribeGroupMembers();
-  groupMembersList.innerHTML =
-    `<li class="list-group-item text-center text-muted">Private chat</li>`;
+  groupMembersList.innerHTML = `<li class="list-group-item text-center text-muted">Private chat</li>`;
 
   listenForMessages();
 };
-
 
 /* ================= RESET ================= */
 function resetChatUI() {
   chatBox.innerHTML = "";
   chatTitle.textContent = "Select a Group or User";
-  groupMembersList.innerHTML =
-    `<li class="list-group-item text-center text-muted">Select a group</li>`;
+  groupMembersList.innerHTML = `<li class="list-group-item text-center text-muted">Select a group</li>`;
 
   mode = null;
   activeGroup = null;
