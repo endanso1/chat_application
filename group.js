@@ -213,19 +213,28 @@ function listenForGroupMembers(groupId) {
           "list-group-item d-flex justify-content-between align-items-center";
 
         li.innerHTML = `
-        <span>${u.fullName || "User"}</span>
-        ${
-          uid === g.admin
-            ? `<span class="badge rounded-pill bg-warning text-dark px-2">Admin</span>`
-            : `<span class="badge rounded-pill bg-secondary px-2">Member</span>`
+          <span>${u.fullName || "User"}</span>
+          ${
+            uid === g.admin
+              ? `<span class="badge rounded-pill bg-warning text-dark px-2">Admin</span>`
+              : `<span class="badge rounded-pill bg-secondary px-2">Member</span>`
+          }
+        `;
+
+        // ✅ CLICK GROUP MEMBER TO START PRIVATE CHAT
+        if (uid !== currentUser.uid) {
+          li.style.cursor = "pointer";
+          li.onclick = () => {
+            openPrivateChat(uid, u.fullName || "User");
+          };
         }
-      `;
 
         groupMembersList.appendChild(li);
       }
     }
   );
 }
+
 
 /* ================= SEND MESSAGE ================= */
 window.sendMessage = async () => {

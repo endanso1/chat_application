@@ -1,149 +1,151 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Distributed Chat Dashboard</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Distributed Chat-Group10</title>
+    <link rel="icon" href="favicon.png" />
+    <link rel="apple-touch-icon" href="favicon.png" />
 
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
-</head>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
 
-<body>
+  <body>
+    <!-- ================= NAVBAR ================= -->
+    <nav
+       class="navbar navbar-dark bg-primary px-4 d-flex justify-content-between sticky-top"
+    >
+      <span class="navbar-brand fw-bold">
+        Welcome, <span id="navUserName">Loading...</span>
+      </span>
 
-<!-- ================= NAVBAR ================= -->
-<nav class="navbar navbar-dark bg-primary px-4 d-flex justify-content-between">
+      <a href="edit-profile.html">
+        <img
+          id="navProfilePic"
+          src="https://www.w3schools.com/howto/img_avatar.png"
+          class="rounded-circle"
+          width="36"
+          height="36"
+          style="cursor: pointer"
+        />
+      </a>
 
-  <span class="navbar-brand fw-bold">
-    Welcome, <span id="navUserName">Loading...</span>
-  </span>
+      <button class="btn btn-outline-light bg-danger btn-sm" onclick="logout()">
+        Logout
+      </button>
+    </nav>
 
-  <a href="edit-profile.html">
-  <img
-    id="navProfilePic"
-    src="https://www.w3schools.com/howto/img_avatar.png"
-    class="rounded-circle"
-    width="36"
-    height="36"
-    style="cursor:pointer"
-  >
-</a>
+    <!-- ================= DASHBOARD ================= -->
+    <div class="container-fluid">
+      <div class="row dashboard">
+        <!-- GROUPS -->
+        <div class="col-md-3 sidebar p-3">
+          <button
+            class="btn btn-outline-primary w-100 d-md-none mb-2"
+            data-bs-toggle="collapse"
+            data-bs-target="#groupSection"
+          >
+            Groups
+          </button>
 
+          <div id="groupSection" class="collapse d-md-block">
+            <h6 class="d-none d-md-block">Groups</h6>
+            <ul id="groupList" class="list-group mb-3"></ul>
 
-  <button class="btn btn-outline-light bg-danger btn-sm" onclick="logout()">
-      Logout
-    </button>
-</nav>
+            <input
+              id="groupName"
+              class="form-control mb-2"
+              placeholder="Enter group name"
+            />
+            <button class="btn btn-success w-100" onclick="createGroup()">
+              Create Group
+            </button>
+          </div>
+        </div>
 
-<!-- ================= DASHBOARD ================= -->
-<div class="container-fluid">
-  <div class="row dashboard">
+        <!-- MEMBERS + USERS -->
+        <div class="col-md-3 p-3">
+          <!-- GROUP MEMBERS -->
+          <div class="card mb-3">
+            <div class="card-header fw-bold text-center">Group Members</div>
 
-    <!-- GROUPS -->
-<div class="col-md-3 sidebar p-3">
-  <button class="btn btn-outline-primary w-100 d-md-none mb-2"
-    data-bs-toggle="collapse"
-    data-bs-target="#groupSection">
-    Groups
-  </button>
+            <ul id="groupMembers" class="list-group list-group-flush small">
+              <li class="list-group-item text-muted text-center">
+                Select a group
+              </li>
+            </ul>
+          </div>
 
-  <div id="groupSection" class="collapse d-md-block">
-    <h6 class="d-none d-md-block">Groups</h6>
-    <ul id="groupList" class="list-group mb-3"></ul>
+          <!-- USERS -->
+          <div class="card h-100">
+            <div class="card-header fw-bold">Users</div>
+            <ul id="userList" class="list-group list-group-flush"></ul>
+          </div>
+        </div>
 
-    <input id="groupName" class="form-control mb-2" placeholder="New group name">
-    <button class="btn btn-success w-100" onclick="createGroup()">
-      Create Group
-    </button>
-  </div>
-</div>
+        <!-- CHAT -->
+        <div class="col-md-6 p-3">
+          <div class="card h-100">
+            <div class="card-header fw-bold" id="chatTitle">
+              Select a Group or User
+            </div>
 
-<!-- MEMBERS + USERS -->
-<div class="col-md-3 p-3">
+            <div class="card-body chat-box" id="chatBox"></div>
 
-  <!-- GROUP MEMBERS -->
-  <div class="card mb-3">
-    <div class="card-header fw-bold text-center">
-      Group Members
-    </div>
-
-    <ul id="groupMembers" class="list-group list-group-flush small">
-      <li class="list-group-item text-muted text-center">
-        Select a group
-      </li>
-    </ul>
-  </div>
-
-  <!-- USERS -->
-  <div class="card h-100">
-    <div class="card-header fw-bold">Users</div>
-    <ul id="userList" class="list-group list-group-flush"></ul>
-  </div>
-
-</div>
-
-<!-- CHAT -->
-<div class="col-md-6 p-3">
-  <div class="card h-100">
-    <div class="card-header fw-bold" id="chatTitle">
-      Select a Group or User
-    </div>
-
-    <div class="card-body chat-box" id="chatBox"></div>
-
-    <div class="card-footer">
-      <div class="input-group">
-        <input id="messageInput" class="form-control" placeholder="Type message">
-        <button class="btn btn-primary" onclick="sendMessage()">Send</button>
+            <div class="card-footer">
+              <div class="input-group">
+                <input
+                  id="messageInput"
+                  class="form-control"
+                  placeholder="Type message"
+                />
+                <button class="btn btn-primary" onclick="sendMessage()">
+                  Send
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
-  </div>
-</div>
 
+    <!-- ================= FOOTER ================= -->
+    <footer class="footer bg-primary text-light pt-4 mt-4">
+      <div class="container">
+        <div class="row">
+          <div class="col-md-3 text-center mb-3">
+            <img src="gctu.png" class="footer-logo mb-2" alt="GCTU" />
+            <p class="small">Ghana Communication Technology University</p>
+          </div>
 
+          <div class="col-md-5">
+            <h6 class="fw-bold">Project Group Members</h6>
+            <ul class="list-unstyled small">
+              <li>Victoria Manwo – 2526430234</li>
+              <li>Samuel Okyere – 2526430218</li>
+              <li>Edmund Appeadu Danso – 2526430141</li>
+              <li>Kelvin Boamah Sarpong – 2526430211</li>
+            </ul>
+          </div>
 
-  </div>
-</div>
-
-<!-- ================= FOOTER ================= -->
-<footer class="footer bg-primary text-light pt-4 mt-4">
-  <div class="container">
-    <div class="row">
-
-      <div class="col-md-3 text-center mb-3">
-        <img src="gctu.png" class="footer-logo mb-2" alt="GCTU">
-        <p class="small">Ghana Communication Technology University</p>
+          <div class="col-md-4">
+            <h6 class="fw-bold">Project Description</h6>
+            <p class="small">
+              Distributed real-time chat application with group messaging,
+              private chats, presence detection, and timestamps using Firebase.
+            </p>
+          </div>
+        </div>
       </div>
+    </footer>
 
-      <div class="col-md-5">
-        <h6 class="fw-bold">Project Group Members</h6>
-        <ul class="list-unstyled small">
-          <li>Victoria Manwo – 2526430234</li>
-          <li>Samuel Okyere – 2526430218</li>
-          <li>Edmund Appeadu Danso – 2526430141</li>
-          <li>Kelvin Boamah Sarpong – 2526430211</li>
-        </ul>
-      </div>
-
-      <div class="col-md-4">
-        <h6 class="fw-bold">Project Description</h6>
-        <p class="small">
-          Distributed real-time chat application with group messaging,
-          private chats, presence detection, and timestamps using Firebase.
-        </p>
-      </div>
-
-    </div>
-  </div>
-</footer>
-
-
-
-
-<script type="module" src="auth.js"></script>
-<script type="module" src="group.js"></script>
-<!-- <script type="module" src="chat.js"></script> -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-
-</body>
+    <script type="module" src="auth.js"></script>
+    <script type="module" src="group.js"></script>
+    <!-- <script type="module" src="chat.js"></script> -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  </body>
 </html>
