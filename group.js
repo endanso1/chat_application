@@ -15,7 +15,8 @@ import {
   arrayRemove,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { onAuthStateChanged } from
+  "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 /* ================= DOM ================= */
 const chatBox = document.getElementById("chatBox");
@@ -36,7 +37,7 @@ let activeChatId = null;
 let unsubscribeMessages = null;
 let unsubscribeGroupMembers = null;
 
-const userCache = {}; // uid → fullName
+const userCache = {};
 
 /* ================= HELPERS ================= */
 function getPrivateChatId(uid1, uid2) {
@@ -47,9 +48,7 @@ async function getSenderName(uid) {
   if (userCache[uid]) return userCache[uid];
 
   const snap = await getDoc(doc(db, "users", uid));
-  if (!snap.exists()) return "Unknown";
-
-  const name = snap.data().fullName || "User";
+  const name = snap.exists() ? snap.data().fullName || "User" : "Unknown";
   userCache[uid] = name;
   return name;
 }
@@ -125,7 +124,7 @@ function loadGroups() {
       const buttons = li.querySelectorAll("button");
 
       buttons[0].onclick = () =>
-        isMember ? leaveGroup(groupId) : joinGroup(groupId);
+        isMember ? leaveGroup(groupId, g.name) : joinGroup(groupId, g.name);
 
       if (isAdmin) {
         buttons[1].onclick = () => editGroup(groupId, g.name);
@@ -145,17 +144,21 @@ function loadGroups() {
   });
 }
 
-/* ================= JOIN / LEAVE ================= */
-async function joinGroup(groupId) {
+/* ================= JOIN / LEAVE (ALERT ONLY) ================= */
+async function joinGroup(groupId, groupName) {
   await updateDoc(doc(db, "groups", groupId), {
     members: arrayUnion(currentUser.uid),
   });
+
+  alert(`You joined "${groupName}"`);
 }
 
-async function leaveGroup(groupId) {
+async function leaveGroup(groupId, groupName) {
   await updateDoc(doc(db, "groups", groupId), {
     members: arrayRemove(currentUser.uid),
   });
+
+  alert(`You left "${groupName}"`);
 
   if (activeGroup === groupId) resetChatUI();
 }
@@ -194,47 +197,39 @@ window.selectGroup = (groupId, groupName) => {
 function listenForGroupMembers(groupId) {
   if (unsubscribeGroupMembers) unsubscribeGroupMembers();
 
-  unsubscribeGroupMembers = onSnapshot(
-    doc(db, "groups", groupId),
-    async (snap) => {
-      if (!snap.exists()) return;
+  unsubscribeGroupMembers = onSnapshot(doc(db, "groups", groupId), async (snap) => {
+    if (!snap.exists()) return;
 
-      const g = snap.data();
-      groupMembersList.innerHTML = "";
+    groupMembersList.innerHTML = "";
+    const g = snap.data();
 
-      for (const uid of g.members) {
-        const userSnap = await getDoc(doc(db, "users", uid));
-        if (!userSnap.exists()) continue;
+    for (const uid of g.members) {
+      const uSnap = await getDoc(doc(db, "users", uid));
+      if (!uSnap.exists()) continue;
 
-        const u = userSnap.data();
-        const li = document.createElement("li");
+      const li = document.createElement("li");
+      li.className =
+        "list-group-item d-flex justify-content-between align-items-center";
 
-        li.className =
-          "list-group-item d-flex justify-content-between align-items-center";
+      li.innerHTML = `
+        <span>${uSnap.data().fullName || "User"}</span>
+        <span class="badge ${
+          uid === g.admin ? "bg-warning text-dark" : "bg-secondary"
+        }">
+          ${uid === g.admin ? "Admin" : "Member"}
+        </span>
+      `;
 
-        li.innerHTML = `
-          <span>${u.fullName || "User"}</span>
-          ${
-            uid === g.admin
-              ? `<span class="badge rounded-pill bg-warning text-dark px-2">Admin</span>`
-              : `<span class="badge rounded-pill bg-secondary px-2">Member</span>`
-          }
-        `;
-
-        // ✅ CLICK GROUP MEMBER TO START PRIVATE CHAT
-        if (uid !== currentUser.uid) {
-          li.style.cursor = "pointer";
-          li.onclick = () => {
-            openPrivateChat(uid, u.fullName || "User");
-          };
-        }
-
-        groupMembersList.appendChild(li);
+      if (uid !== currentUser.uid) {
+        li.style.cursor = "pointer";
+        li.onclick = () =>
+          openPrivateChat(uid, uSnap.data().fullName || "User");
       }
-    }
-  );
-}
 
+      groupMembersList.appendChild(li);
+    }
+  });
+}
 
 /* ================= SEND MESSAGE ================= */
 window.sendMessage = async () => {
@@ -273,7 +268,6 @@ function listenForMessages() {
       where("receiver", "==", activeGroup)
     );
   } else {
-    // ✅ PRIVATE CHAT (SAFE & CORRECT)
     q = query(
       collection(db, "messages"),
       where("type", "==", "private"),
@@ -303,25 +297,21 @@ function listenForMessages() {
 async function displayMessage(m) {
   const isMe = m.sender === currentUser.uid;
   const div = document.createElement("div");
-
   div.className = "message " + (isMe ? "you" : "other");
 
   let senderLine = "";
   if (mode === "group" && !isMe) {
-    senderLine = `
-      <div class="small fw-semibold mb-1">
-        ${await getSenderName(m.sender)}
-      </div>
-    `;
+    senderLine = `<div class="small fw-semibold mb-1">
+      ${await getSenderName(m.sender)}
+    </div>`;
   }
 
   div.innerHTML = `
     ${senderLine}
     <div>${m.text}</div>
     <small class="opacity-75 d-block text-end">
-  ${m.timestamp ? m.timestamp.toDate().toLocaleString() : ""}
-</small>
-
+      ${m.timestamp ? m.timestamp.toDate().toLocaleString() : ""}
+    </small>
   `;
 
   chatBox.appendChild(div);
@@ -335,40 +325,19 @@ function loadUsers() {
     snap.forEach((d) => {
       if (d.id === currentUser.uid) return;
 
-      const u = d.data();
       const li = document.createElement("li");
+      li.className = "list-group-item";
+      li.textContent = d.data().fullName || "User";
+      li.onclick = () =>
+        openPrivateChat(d.id, d.data().fullName || "User");
 
-      li.className =
-        "list-group-item d-flex justify-content-between align-items-center";
-
-      li.innerHTML = `
-        <span>${u.fullName || "User"}</span>
-        <span class="badge">&nbsp;</span>
-      `;
-
-      li.onclick = () => openPrivateChat(d.id, u.fullName || "User");
       userList.appendChild(li);
     });
   });
 }
 
 /* ================= PRIVATE CHAT ================= */
-// window.openPrivateChat = (uid, name) => {
-//   mode = "private";
-//   activeUser = uid;
-//   activeGroup = null;
-//   activeChatId = getPrivateChatId(currentUser.uid, uid);
-
-//   chatTitle.textContent = "Chat with " + name;
-
-//   if (unsubscribeGroupMembers) unsubscribeGroupMembers();
-//   groupMembersList.innerHTML =
-//     `<li class="list-group-item text-center text-muted">Private chat</li>`;
-
-//   listenForMessages();
-// };
 window.openPrivateChat = (uid, name) => {
-  // ✅ SET STATE FIRST
   activeChatId = getPrivateChatId(currentUser.uid, uid);
   activeUser = uid;
   activeGroup = null;
@@ -377,7 +346,8 @@ window.openPrivateChat = (uid, name) => {
   chatTitle.textContent = "Chat with " + name;
 
   if (unsubscribeGroupMembers) unsubscribeGroupMembers();
-  groupMembersList.innerHTML = `<li class="list-group-item text-center text-muted">Private chat</li>`;
+  groupMembersList.innerHTML =
+    `<li class="list-group-item text-center text-muted">Private chat</li>`;
 
   listenForMessages();
 };
@@ -386,7 +356,8 @@ window.openPrivateChat = (uid, name) => {
 function resetChatUI() {
   chatBox.innerHTML = "";
   chatTitle.textContent = "Select a Group or User";
-  groupMembersList.innerHTML = `<li class="list-group-item text-center text-muted">Select a group</li>`;
+  groupMembersList.innerHTML =
+    `<li class="list-group-item text-center text-muted">Select a group</li>`;
 
   mode = null;
   activeGroup = null;
